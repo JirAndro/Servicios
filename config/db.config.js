@@ -1,7 +1,8 @@
 // config/db.config.js
 module.exports = {
-    HOST: "localhost",
-    USER: "Andro",
-    PASSWORD: "Andro123+", // ¡Asegúrate que esta sea la contraseña que usaste!
-    DB: "videojuegos"
+    HOST: "gateway01.us-west-2.prod.aws.tidbcloud.com", // Endpoint de TiDB Cloud
+    USER: "2vKtFTCNBhvUH8H.root",                     // Usuario de TiDB Cloud
+    PASSWORD: "Vss1pvz3SJsZsyKq",                     // Contraseña de TiDB Cloud que reseteaste
+    DB: "videojuegos",                                // Nombre de tu base de datos en TiDB Cloud
+    PORT_DB: 4000                                      // Puerto de TiDB Cloud
 };
