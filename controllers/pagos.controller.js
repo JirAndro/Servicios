@@ -37,7 +37,7 @@ const crearOrdenPayPal = async (req, res) => {
                 // Puedes añadir más detalles como items si lo deseas
                 // custom_id: pedido.id.toString() // Para identificar el pedido en PayPal
             }],
-            application_context: {
+            
 application_context: {
     return_url: `https://servicios-601c.onrender.com/api/pagos/paypal/capturar-orden?pedidoId=${pedido.id}`,
     cancel_url: `https://servicios-601c.onrender.com/api/pagos/paypal/cancelar-orden?pedidoId=${pedido.id}`,
@@ -46,7 +46,7 @@ application_context: {
     user_action: "PAY_NOW",
     shipping_preference: "NO_SHIPPING" // <<<---- AÑADE ESTA LÍNEA
 }
-            }
+            
         });
 
         const order = await client.execute(request);
