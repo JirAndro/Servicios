@@ -38,12 +38,13 @@ const crearOrdenPayPal = async (req, res) => {
                 // custom_id: pedido.id.toString() // Para identificar el pedido en PayPal
             }],
             application_context: {
-                application_context: {
+application_context: {
     return_url: `https://servicios-601c.onrender.com/api/pagos/paypal/capturar-orden?pedidoId=${pedido.id}`,
     cancel_url: `https://servicios-601c.onrender.com/api/pagos/paypal/cancelar-orden?pedidoId=${pedido.id}`,
     brand_name: "Tienda de Videojuegos Andro",
-    landing_page: "LOGIN",
-    user_action: "PAY_NOW"
+    landing_page: "LOGIN", // O "GUEST_CHECKOUT" si quieres permitir pagos sin cuenta PayPal fácilmente
+    user_action: "PAY_NOW",
+    shipping_preference: "NO_SHIPPING" // <<<---- AÑADE ESTA LÍNEA
 }
             }
         });
