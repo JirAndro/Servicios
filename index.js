@@ -1,3 +1,4 @@
+//prueba render
 // index.js (CON LOGS DE DIAGNÓSTICO y NUEVAS RUTAS DE USUARIOS PARA ADMIN)
 const express = require('express');
 const cors = require('cors'); // Asumo que ya lo instalaste y está en tu package.json
