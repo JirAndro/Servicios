@@ -1,20 +1,24 @@
-// Crear un nuevo archivo: routes/usuarios.routes.js
+// routes/usuarios.routes.js
 const { Router } = require('express');
-const { obtenerTodosLosUsuarios } = require('../controllers/usuarios.controller.js'); // Ruta a tu nuevo controlador
-const { verifyToken, isAdmin } = require('../middlewares/authJwt.js'); // Tus middlewares
+const { 
+    obtenerTodosLosUsuarios,
+    actualizarUsuarioPorAdmin, // <<<--- IMPORTAR
+    eliminarUsuarioPorAdmin    // <<<--- IMPORTAR
+} = require('../controllers/usuarios.controller.js');
+const { verifyToken, isAdmin } = require('../middlewares/authJwt.js');
 
 const router = Router();
 
-// RUTA PARA OBTENER TODOS LOS USUARIOS (Solo Admin)
-// GET /api/usuarios  (o podrías usar /api/admin/usuarios si prefieres agrupar)
+// GET /api/admin/usuarios - Obtener todos los usuarios (Solo Admin)
 router.get('/', [verifyToken, isAdmin], obtenerTodosLosUsuarios);
 
+// PUT /api/admin/usuarios/:id - Actualizar un usuario por Admin
+router.put('/:id', [verifyToken, isAdmin], actualizarUsuarioPorAdmin); // <<<--- NUEVA RUTA
 
-// Aquí irán otras rutas para que el admin gestione usuarios 
-// (ej. PUT /:id/rol, DELETE /:id, etc.)
+// DELETE /api/admin/usuarios/:id - Eliminar un usuario por Admin
+router.delete('/:id', [verifyToken, isAdmin], eliminarUsuarioPorAdmin); // <<<--- NUEVA RUTA
 
 
-// Log para confirmar que este archivo de rutas se cargó
-console.log("[LOG BACKEND RUTAS] Router de Administración de Usuarios (usuarios.routes.js) configurado con ruta: GET /");
+console.log("[LOG BACKEND RUTAS] Router de Administración de Usuarios (usuarios.routes.js) configurado con rutas: GET /, PUT /:id, DELETE /:id");
 
 module.exports = router;
