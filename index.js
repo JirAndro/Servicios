@@ -1,34 +1,42 @@
-// index.js
+// index.js (o app.js/server.js, tu archivo principal de Express)
 const express = require('express');
+const cors = require('cors'); // Si usas CORS, asegúrate de que esté importado y configurado
+
+// Importar tus módulos de rutas
 const productosRoutes = require('./routes/productos.routes.js');
 const authRoutes = require('./routes/auth.routes.js'); 
-const pedidosRoutes = require('./routes/pedidos.routes.js');
-const pagosRoutes = require('./routes/pagos.routes.js'); // <<< Nueva línea
+const pedidosRoutes = require('./routes/pedidos.routes.js'); // Desde el archivo actualizado arriba
+const pagosRoutes = require('./routes/pagos.routes.js');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5000; // Render usa process.env.PORT
 
-// OJO: PayPal envía webhooks como application/json, pero a veces otros formatos.
-// express.json() es para la mayoría de los casos. Si tienes problemas con webhooks,
-// podrías necesitar body-parser para raw body si PayPal no lo envía como JSON estándar.
-app.use(express.json()); 
-// Para webhooks de PayPal, a veces es mejor parsear el cuerpo raw y luego verificar
-// app.post('/api/pagos/paypal/webhook', express.raw({ type: 'application/json' }), webhookPayPalControllerFn);
+// Middlewares
+app.use(cors()); // Configura CORS si es necesario para permitir peticiones desde tu frontend
+app.use(express.json()); // Para parsear cuerpos de petición JSON
 
-
+// Ruta raíz de prueba
 app.get('/', (req, res) => {
-  res.send('¡Hola Mundo desde mi API de Videojuegos!');
+  res.send('¡Hola Mundo desde mi API de Videojuegos GamersITOs!');
 });
 
-// Usar las rutas
+// Montar las rutas de la API
 app.use('/api/productos', productosRoutes);
+console.log("[LOG BACKEND INDEX] Rutas de Productos montadas en /api/productos");
+
 app.use('/api/auth', authRoutes); 
-app.use('/api/pedidos', pedidosRoutes);
-app.use('/api/pagos', pagosRoutes); // <<< Nueva línea
+console.log("[LOG BACKEND INDEX] Rutas de Autenticación montadas en /api/auth");
+
+app.use('/api/pedidos', pedidosRoutes); // Usa el router de pedidos actualizado
+console.log("[LOG BACKEND INDEX] Rutas de Pedidos montadas en /api/pedidos");
+
+app.use('/api/pagos', pagosRoutes);
+console.log("[LOG BACKEND INDEX] Rutas de Pagos montadas en /api/pagos");
+
 
 app.listen(PORT, () => {
-  console.log(`Servidor escuchando en el puerto ${PORT}`);
-  console.log(`Puedes acceder en http://localhost:${PORT} (si estás en el servidor)`);
-  console.log(`O http://localhost:${PORT} desde tu navegador en Windows`);
+  console.log(`[LOG BACKEND INDEX] Servidor escuchando en el puerto ${PORT}`);
+  // Las siguientes líneas son más para desarrollo local, en Render la URL será la de tu servicio.
+  // console.log(`Puedes acceder en http://localhost:${PORT} (si estás en el servidor)`);
+  // console.log(`O http://localhost:${PORT} desde tu navegador en Windows`);
 });
-
