@@ -179,65 +179,68 @@ const eliminarProducto = async (req, res) => {
     const productoId = req.params.id;
     const adminId = req.usuarioId; // Asumimos que verifyToken/isAdmin ya pusieron esto
 
-    console.log(`[LOG APP - eliminarProducto] Solicitud de adminId: ${adminId} para eliminar (desactivar) productoId: ${productoId}`);
+    console.log(`[LOG APP - eliminarProducto FISICO] Solicitud de adminId: ${adminId} para ELIMINAR FÍSICAMENTE productoId: ${productoId}`);
 
     if (!productoId) {
-        console.warn("[LOG APP - eliminarProducto] Intento de eliminar sin productoId.");
+        console.warn("[LOG APP - eliminarProducto FISICO] Intento de eliminar sin productoId.");
         return res.status(400).json({ mensaje: "Se requiere el ID del producto." });
     }
 
     let connection;
     try {
         connection = await dbPool.getConnection();
-        await connection.beginTransaction(); // Usar transacción para consistencia
-        console.log(`[LOG APP - eliminarProducto] Transacción iniciada para productoId: ${productoId}`);
+        console.log(`[LOG APP - eliminarProducto FISICO] Conexión a BD obtenida para productoId: ${productoId}`);
+        await connection.beginTransaction(); // Iniciar transacción
+        console.log(`[LOG APP - eliminarProducto FISICO] Transacción iniciada para productoId: ${productoId}`);
 
-        const [productosExistentes] = await connection.query("SELECT id, activo FROM Productos WHERE id = ? FOR UPDATE", [productoId]);
+        // (Opcional) Verificar si el producto existe antes de intentar eliminarlo
+        const [productosExistentes] = await connection.query("SELECT id FROM Productos WHERE id = ?", [productoId]);
         if (productosExistentes.length === 0) {
             await connection.rollback();
             connection.release();
-            console.warn(`[LOG APP - eliminarProducto] ProductoId ${productoId} no encontrado para eliminar.`);
+            console.warn(`[LOG APP - eliminarProducto FISICO] ProductoId ${productoId} no encontrado para eliminar. Rollback.`);
             return res.status(404).json({ mensaje: `Producto con ID ${productoId} no encontrado.` });
         }
         
-        const productoActual = productosExistentes[0];
-        console.log(`[LOG APP - eliminarProducto] ProductoId ${productoId} encontrado. Estado actual activo: ${productoActual.activo}`);
+        console.log(`[LOG APP - eliminarProducto FISICO] ProductoId ${productoId} encontrado. Procediendo con DELETE.`);
 
-        if (productoActual.activo === 0 || productoActual.activo === false) {
-            await connection.rollback(); // No hay nada que hacer
-            connection.release();
-            console.log(`[LOG APP - eliminarProducto] ProductoId ${productoId} ya estaba inactivo.`);
-            return res.json({ mensaje: `El producto con ID ${productoId} ya está inactivo.` });
-        }
-
-        console.log(`[LOG APP - eliminarProducto] Intentando UPDATE Productos SET activo = FALSE WHERE id = ${productoId}`);
+        // --- ESTA ES LA CONSULTA CLAVE PARA ELIMINACIÓN FÍSICA ---
         const [result] = await connection.query(
-            "UPDATE Productos SET activo = FALSE WHERE id = ?", 
+            "DELETE FROM Productos WHERE id = ?", 
             [productoId]
         );
+        // --- FIN DE LA CONSULTA CLAVE ---
         
-        console.log(`[LOG APP - eliminarProducto] Resultado de UPDATE para productoId ${productoId}: Filas afectadas: ${result.affectedRows}`);
+        console.log(`[LOG APP - eliminarProducto FISICO] Resultado de DELETE para productoId ${productoId}: Filas afectadas: ${result.affectedRows}`);
 
         if (result.affectedRows > 0) {
             await connection.commit();
-            console.log(`[LOG APP - eliminarProducto] ProductoId ${productoId} marcado como inactivo en BD. Transacción commit.`);
-            res.json({ mensaje: `Producto con ID ${productoId} marcado como inactivo exitosamente.` });
+            console.log(`[LOG APP - eliminarProducto FISICO] ProductoId ${productoId} ELIMINADO FÍSICAMENTE de la BD. Transacción commit.`);
+            res.json({ mensaje: `Producto con ID ${productoId} eliminado exitosamente de la base de datos.` });
         } else {
-            // Si affectedRows es 0, pero el producto existía y estaba activo, es un caso raro.
+            // Esto no debería pasar si la verificación anterior encontró el producto,
+            // a menos que se eliminara concurrentemente.
             await connection.rollback();
-            console.warn(`[LOG APP - eliminarProducto] No se afectaron filas al intentar desactivar productoId ${productoId}, aunque se encontró activo. Rollback.`);
-            res.status(500).json({ mensaje: `No se pudo actualizar el producto con ID ${productoId}.` });
+            console.warn(`[LOG APP - eliminarProducto FISICO] No se afectaron filas al intentar DELETE para productoId ${productoId}. Rollback.`);
+            res.status(404).json({ mensaje: `Producto con ID ${productoId} no encontrado o no se pudo eliminar.` });
         }
     } catch (error) {
-        console.error(`[LOG APP - eliminarProducto] Error al desactivar productoId ${productoId}:`, error);
+        console.error(`[LOG APP - eliminarProducto FISICO] Error CRÍTICO al eliminar físicamente productoId ${productoId}:`, error);
+        // Considerar si el error es por una restricción de llave foránea (FK constraint)
+        // si este producto está referenciado en DetallesPedido.
+        // Si es así, necesitarías borrar primero los DetallesPedido o configurar ON DELETE CASCADE en tu FK.
         if (connection) {
-            await connection.rollback();
-            console.log(`[LOG APP - eliminarProducto] Transacción revertida (rollback) para productoId ${productoId}`);
+            try {
+                await connection.rollback();
+                console.log(`[LOG APP - eliminarProducto FISICO] Transacción revertida (rollback) debido a error para productoId ${productoId}`);
+            } catch (rollbackError) {
+                console.error(`[LOG APP - eliminarProducto FISICO] Error al hacer rollback para productoId ${productoId}:`, rollbackError);
+            }
         }
-        res.status(500).json({ mensaje: "Error al eliminar el producto. Intente más tarde." });
+        res.status(500).json({ mensaje: "Error interno al eliminar el producto. Intente más tarde.", detalle: error.message });
     } finally {
         if (connection) {
-            console.log(`[LOG APP - eliminarProducto] Liberando conexión a BD para productoId: ${productoId}`);
+            console.log(`[LOG APP - eliminarProducto FISICO] Liberando conexión a BD para productoId: ${productoId}`);
             connection.release();
         }
     }
