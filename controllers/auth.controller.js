@@ -29,7 +29,10 @@ const registrarUsuario = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 8);
         console.log(`[LOG APP - registrarUsuario] Contraseña hasheada para email: ${email}`);
 
-        const sql = "INSERT INTO Usuarios (nombre, email, password, rol, fecha_creacion, activo) VALUES (?, ?, ?, ?, NOW(), TRUE)";
+        // Ajustamos el SQL para que coincida con tu tabla Usuarios
+        // Asumimos que 'fechaRegistro' existe y se poblará con NOW()
+        // Si 'fechaRegistro' tiene DEFAULT CURRENT_TIMESTAMP en la BD, no necesitas incluirla aquí.
+        const sql = "INSERT INTO Usuarios (nombre, email, password, rol, fechaRegistro) VALUES (?, ?, ?, ?, NOW())";
         const [result] = await connection.query(sql, [nombre, email, hashedPassword, rol || 'cliente']);
         const nuevoUsuarioId = result.insertId;
         console.log(`[LOG APP - registrarUsuario] Usuario insertado con ID: ${nuevoUsuarioId}`);
@@ -61,23 +64,22 @@ const loginUsuario = async (req, res) => {
     try {
         connection = await dbPool.getConnection();
         console.log(`[LOG APP - loginUsuario] Conexión a BD obtenida para email: ${email}`);
-        // Asegúrate de seleccionar el campo 'activo' si lo tienes y quieres verificarlo
-        const [users] = await connection.query("SELECT id, nombre, email, password, rol, activo FROM Usuarios WHERE email = ?", [email]);
-        connection.release(); // Liberar conexión tan pronto como ya no se necesite
-
+        // Quitamos 'activo' del SELECT ya que no existe en tu tabla
+        const [users] = await connection.query("SELECT id, nombre, email, password, rol, fechaRegistro FROM Usuarios WHERE email = ?", [email]);
+        
         if (users.length === 0) {
+            connection.release(); // Liberar conexión aquí también
             console.warn(`[LOG APP - loginUsuario] Email no encontrado: ${email}`);
             return res.status(401).json({ mensaje: "Credenciales inválidas." });
         }
 
         const usuario = users[0];
-        console.log(`[LOG APP - loginUsuario] Usuario encontrado: ID ${usuario.id}, Rol: ${usuario.rol}, Activo: ${usuario.activo}`);
+        // Quitamos 'Activo: ${usuario.activo}' del log ya que no existe
+        console.log(`[LOG APP - loginUsuario] Usuario encontrado: ID ${usuario.id}, Rol: ${usuario.rol}, FechaRegistro: ${usuario.fechaRegistro}`);
+        connection.release(); // Liberar conexión después de usar 'usuario' y antes de operaciones async largas
 
-        // (Opcional) Verificar si la cuenta está activa
-        if (usuario.activo === 0 || usuario.activo === false) { // MySQL booleans son 0 o 1
-            console.warn(`[LOG APP - loginUsuario] Intento de login para cuenta inactiva: ${email}`);
-            return res.status(403).json({ mensaje: "Esta cuenta ha sido desactivada." });
-        }
+        // La verificación de 'usuario.activo' se elimina porque la columna no existe
+        // if (usuario.activo === 0 || usuario.activo === false) { ... }
 
         const passwordIsValid = await bcrypt.compare(password, usuario.password);
         if (!passwordIsValid) {
@@ -99,16 +101,15 @@ const loginUsuario = async (req, res) => {
                 nombre: usuario.nombre,
                 email: usuario.email,
                 rol: usuario.rol
-                // No incluyas usuario.activo aquí a menos que la app lo necesite específicamente después del login
+                // fechaRegistro: usuario.fechaRegistro // Podrías añadirlo si la app lo necesita
             },
             accessToken: token
         });
 
     } catch (error) {
         console.error("[LOG APP - loginUsuario] Error al iniciar sesión:", error);
-        // Asegurarse de liberar la conexión si aún no se ha hecho y existe
-        if (connection && connection.connection && connection.connection._pool && connection.connection._pool._freeConnections.indexOf(connection.connection) === -1) {
-          try { connection.release(); } catch (e) { console.error("Error liberando conexión en catch de login:", e); }
+        if (connection) { // Solo intenta liberar si la conexión fue asignada
+            try { connection.release(); } catch (e) { console.error("Error liberando conexión en catch de login:", e); }
         }
         res.status(500).json({ mensaje: "Error al iniciar sesión. Intente más tarde." });
     }
@@ -147,7 +148,6 @@ const actualizarMiPerfil = async (req, res) => {
         } else {
             connection.release();
             console.warn(`[LOG APP - actualizarMiPerfil] UsuarioId: ${usuarioId} - No se encontró el usuario para actualizar o el nombre era el mismo.`);
-            // Considerar si un 404 es apropiado o si un 200 con mensaje de "sin cambios" es mejor si el nombre no cambió.
             res.status(404).json({ mensaje: "Usuario no encontrado o sin cambios necesarios." });
         }
     } catch (error) {
@@ -157,11 +157,11 @@ const actualizarMiPerfil = async (req, res) => {
     }
 };
 
-// Controlador para que un usuario elimine su propia cuenta
+// Controlador para que un usuario elimine FÍSICAMENTE su propia cuenta
 const eliminarMiCuenta = async (req, res) => {
     const usuarioId = req.usuarioId;
     const { password } = req.body;
-    console.log(`[LOG APP - eliminarMiCuenta] UsuarioId: ${usuarioId} solicita eliminar su cuenta.`);
+    console.log(`[LOG APP - eliminarMiCuenta] UsuarioId: ${usuarioId} solicita ELIMINAR FÍSICAMENTE su cuenta.`);
 
     if (!password) {
         console.warn(`[LOG APP - eliminarMiCuenta] UsuarioId: ${usuarioId} no proporcionó contraseña para confirmación.`);
@@ -175,41 +175,37 @@ const eliminarMiCuenta = async (req, res) => {
         
         const [users] = await connection.query("SELECT id, password FROM Usuarios WHERE id = ?", [usuarioId]);
         if (users.length === 0) {
-            connection.release();
-            console.error(`[LOG APP - eliminarMiCuenta] UsuarioId: ${usuarioId} del token no encontrado en BD.`);
+            // connection.release(); // Se liberará en el finally
+            console.error(`[LOG APP - eliminarMiCuenta] UsuarioId: ${usuarioId} del token no encontrado en BD (inesperado).`);
+            // No es necesario hacer rollback si no se inició transacción aún
+            if (connection) connection.release();
             return res.status(404).json({ mensaje: "Usuario no encontrado." });
         }
         const usuario = users[0];
 
         const passwordIsValid = await bcrypt.compare(password, usuario.password);
         if (!passwordIsValid) {
-            connection.release();
+            // connection.release(); // Se liberará en el finally
             console.warn(`[LOG APP - eliminarMiCuenta] UsuarioId: ${usuarioId} - Contraseña incorrecta para eliminación.`);
+            if (connection) connection.release();
             return res.status(401).json({ mensaje: "Contraseña incorrecta. No se puede eliminar la cuenta." });
         }
 
-        console.log(`[LOG APP - eliminarMiCuenta] UsuarioId: ${usuarioId} - Contraseña verificada. Procediendo con eliminación física.`);
+        console.log(`[LOG APP - eliminarMiCuenta] UsuarioId: ${usuarioId} - Contraseña verificada. Procediendo con eliminación FÍSICA.`);
         await connection.beginTransaction();
         console.log(`[LOG APP - eliminarMiCuenta] UsuarioId: ${usuarioId} - Transacción iniciada.`);
-
-        // AQUÍ MANEJAR DEPENDENCIAS ANTES DE BORRAR (EJ. PEDIDOS)
-        // Opción: Poner Pedidos.usuarioId a NULL si la FK lo permite y quieres mantener los pedidos.
-        // const [updatePedidosResult] = await connection.query("UPDATE Pedidos SET usuarioId = NULL WHERE usuarioId = ?", [usuarioId]);
-        // console.log(`[LOG APP - eliminarMiCuenta] UsuarioId: ${usuarioId} - Pedidos desvinculados: ${updatePedidosResult.affectedRows} filas afectadas.`);
-        // O si tu FK está configurada como ON DELETE SET NULL, la BD lo hará automáticamente.
-        // Si es ON DELETE RESTRICT, la siguiente query fallará si hay pedidos.
-
+        
         const [result] = await connection.query("DELETE FROM Usuarios WHERE id = ?", [usuarioId]);
         console.log(`[LOG APP - eliminarMiCuenta] UsuarioId: ${usuarioId} - Resultado de DELETE: Filas afectadas: ${result.affectedRows}`);
 
         if (result.affectedRows > 0) {
             await connection.commit();
-            console.log(`[LOG APP - eliminarMiCuenta] UsuarioId: ${usuarioId} - Cuenta eliminada físicamente. Transacción commit.`);
-            res.status(200).json({ mensaje: "Tu cuenta ha sido eliminada exitosamente." });
+            console.log(`[LOG APP - eliminarMiCuenta] UsuarioId: ${usuarioId} - Cuenta ELIMINADA FÍSICAMENTE. Transacción commit.`);
+            res.status(200).json({ mensaje: "Tu cuenta ha sido eliminada permanentemente." });
         } else {
             await connection.rollback();
-            console.warn(`[LOG APP - eliminarMiCuenta] UsuarioId: ${usuarioId} - No se afectaron filas en DELETE. Rollback.`);
-            res.status(404).json({ mensaje: "No se pudo eliminar la cuenta, usuario no encontrado (inesperado)." });
+            console.warn(`[LOG APP - eliminarMiCuenta] UsuarioId: ${usuarioId} - No se afectaron filas en DELETE (inesperado). Rollback.`);
+            res.status(404).json({ mensaje: "No se pudo eliminar la cuenta, usuario no encontrado después de verificación." });
         }
     } catch (error) {
         console.error(`[LOG APP - eliminarMiCuenta] UsuarioId: ${usuarioId} - Error CRÍTICO al eliminar cuenta:`, error);
@@ -217,6 +213,8 @@ const eliminarMiCuenta = async (req, res) => {
             try { await connection.rollback(); } catch (rbError) { console.error("[LOG APP - eliminarMiCuenta] Error en rollback:", rbError); }
         }
         if (error.code === 'ER_ROW_IS_REFERENCED_2' || (error.sqlMessage && error.sqlMessage.toLowerCase().includes('foreign key constraint fails'))) {
+             console.warn(`[LOG APP - eliminarMiCuenta] UsuarioId: ${usuarioId} - Intento de eliminar falló por restricción de FK (probablemente pedidos existentes).`);
+             if (connection) connection.release(); // Asegurar liberación si se retorna aquí
              return res.status(409).json({ mensaje: "No se puede eliminar la cuenta porque tiene datos asociados (ej. pedidos). Contacta a soporte."});
         }
         res.status(500).json({ mensaje: "Error interno al procesar la eliminación de la cuenta." });
@@ -228,11 +226,9 @@ const eliminarMiCuenta = async (req, res) => {
     }
 };
 
-
 module.exports = {
     registrarUsuario,
     loginUsuario,
-    actualizarMiPerfil, // <<<--- AÑADIDA
-    eliminarMiCuenta    // <<<--- AÑADIDA
+    actualizarMiPerfil,
+    eliminarMiCuenta 
 };
-
