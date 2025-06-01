@@ -1,6 +1,5 @@
-// index.js (CON LOGS DE DIAGNÓSTICO)
+// index.js (SIN el paquete 'cors')
 const express = require('express');
-const cors = require('cors'); // Es buena idea tenerlo, incluso si lo configuras más tarde
 
 // Importar tus módulos de rutas
 const productosRoutes = require('./routes/productos.routes.js');
@@ -9,12 +8,11 @@ const pedidosRoutes = require('./routes/pedidos.routes.js');
 const pagosRoutes = require('./routes/pagos.routes.js');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5000; // Render usa process.env.PORT
 
 // Middlewares
-app.use(cors()); // Habilita CORS para todas las rutas. Puedes configurarlo más específicamente si lo necesitas.
 app.use(express.json()); // Para parsear cuerpos de petición JSON
-console.log("[LOG BACKEND INDEX] Middlewares básicos (cors, express.json) configurados.");
+console.log("[LOG BACKEND INDEX] Middleware express.json configurado.");
 
 
 // Ruta raíz de prueba
@@ -55,5 +53,6 @@ try {
 
 
 app.listen(PORT, () => {
-  console.log(`[LOG BACKEND INDEX] Servidor escuchando en el puerto ${PORT}. Conexión a BD debería estar establecida o por establecerse.`);
+  console.log(`[LOG BACKEND INDEX] Servidor escuchando en el puerto ${PORT}.`);
+  console.log(`[LOG BACKEND INDEX] Conexión a BD debería estar establecida o por establecerse.`);
 });
