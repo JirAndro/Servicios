@@ -1,18 +1,19 @@
-// index.js (CON LOGS DE DIAGNÓSTICO)
+// index.js (CON LOGS DE DIAGNÓSTICO y NUEVAS RUTAS DE USUARIOS PARA ADMIN)
 const express = require('express');
-const cors = require('cors'); // Es buena idea tenerlo, incluso si lo configuras más tarde
+const cors = require('cors'); // Asumo que ya lo instalaste y está en tu package.json
 
 // Importar tus módulos de rutas
 const productosRoutes = require('./routes/productos.routes.js');
 const authRoutes = require('./routes/auth.routes.js'); 
 const pedidosRoutes = require('./routes/pedidos.routes.js');
 const pagosRoutes = require('./routes/pagos.routes.js');
+const usuariosAdminRoutes = require('./routes/usuarios.routes.js'); // <<<--- IMPORTA TUS NUEVAS RUTAS DE USUARIOS
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middlewares
-app.use(cors()); // Habilita CORS para todas las rutas. Puedes configurarlo más específicamente si lo necesitas.
+app.use(cors()); // Habilita CORS para todas las rutas.
 app.use(express.json()); // Para parsear cuerpos de petición JSON
 console.log("[LOG BACKEND INDEX] Middlewares básicos (cors, express.json) configurados.");
 
@@ -51,6 +52,14 @@ try {
     console.log("[LOG BACKEND INDEX] Rutas de Pagos montadas exitosamente en /api/pagos");
 } catch (e) {
     console.error("[LOG BACKEND INDEX] ERROR al montar Rutas de Pagos:", e);
+}
+
+try {
+    // Usamos '/api/admin/usuarios' como prefijo para estas rutas de admin
+    app.use('/api/admin/usuarios', usuariosAdminRoutes); // <<<--- MONTA LAS NUEVAS RUTAS DE USUARIOS
+    console.log("[LOG BACKEND INDEX] Rutas de Administración de Usuarios montadas exitosamente en /api/admin/usuarios"); // <<<--- LOG DE DIAGNÓSTICO
+} catch (e) { 
+    console.error("[LOG BACKEND INDEX] ERROR al montar Rutas de Administración de Usuarios:", e); 
 }
 
 
