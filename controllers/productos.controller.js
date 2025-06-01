@@ -7,7 +7,7 @@ const dbPool = require('../database.js');
 const obtenerProductos = async (req, res) => {
     try {
         const connection = await dbPool.getConnection();
-        const [rows] = await connection.query("SELECT id, titulo, plataforma, precio, genero, imagenUrl FROM Productos WHERE activo = TRUE");
+        const [rows] = await connection.query("SELECT id, titulo, plataforma, precio, genero, imagenUrl, stock, activo, descripcion, fechaLanzamiento, desarrollador, clasificacion, categoriaId FROM Productos");
         connection.release();
         res.json(rows);
     } catch (error) {
